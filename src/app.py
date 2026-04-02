@@ -255,6 +255,7 @@ def index():
         features[scale_cols] = SCALER.transform(features[scale_cols])
 
         prediction = float(MODEL.predict(features)[0])
+        prediction = max(0.0, prediction)
 
         prepared = float(form_data["quantity_prepared_kg"])
         risk, recommendation = _get_risk_and_recommendation(prediction, prepared)
@@ -300,6 +301,7 @@ def predict_api():
     features[scale_cols] = SCALER.transform(features[scale_cols])
 
     prediction = float(MODEL.predict(features)[0])
+    prediction = max(0.0, prediction)
     prepared = float(payload["quantity_prepared_kg"])
     risk, recommendation = _get_risk_and_recommendation(prediction, prepared)
 
