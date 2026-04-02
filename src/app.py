@@ -11,7 +11,7 @@ import io
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, render_template, request
 from sklearn.preprocessing import StandardScaler
 
 import boto3
@@ -154,6 +154,33 @@ def build_feature_frame(form_data: dict) -> pd.DataFrame:
     return df
 
 
+def _validate_payload(payload: dict) -> dict:
+    """Validate and normalize JSON payload for prediction."""
+    required_fields = [
+        "meal_type",
+        "is_holiday",
+        "special_event",
+        "weather",
+        "expected_people",
+        "actual_people",
+        "quantity_prepared_kg",
+        "menu_type",
+        "food_category",
+    ]
+
+    missing = [field for field in required_fields if field not in payload]
+    if missing:
+        raise ValueError(f"Missing fields: {', '.join(missing)}")
+
+    normalized = dict(payload)
+    normalized["expected_people"] = float(payload["expected_people"])
+    normalized["actual_people"] = float(payload["actual_people"])
+    normalized["quantity_prepared_kg"] = float(payload["quantity_prepared_kg"])
+    normalized["is_holiday"] = int(payload["is_holiday"])
+    normalized["special_event"] = int(payload["special_event"])
+    return normalized
+
+
 def load_training_columns() -> List[str]:
     """Load training feature columns from processed dataset."""
     if USE_S3:
@@ -165,6 +192,16 @@ def load_training_columns() -> List[str]:
     df = df.drop(columns=["leftover_kg"], errors="ignore")
     df = df.drop(columns=["date", "day_of_week"], errors="ignore")
     return df.columns.tolist()
+
+
+def _get_risk_and_recommendation(prediction: float, prepared: float) -> tuple[str, str]:
+    """Return risk level and recommendation text based on predicted waste ratio."""
+    ratio = prediction / prepared if prepared > 0 else 0
+    if ratio < 0.1:
+        return "Low", "Keep current preparation plan and monitor attendance."
+    if ratio < 0.25:
+        return "Medium", "Slightly reduce preparation or improve forecasting for this meal."
+    return "High", "Reduce preparation and increase redistribution planning."
 
 
 def build_scaler() -> StandardScaler:
@@ -220,16 +257,7 @@ def index():
         prediction = float(MODEL.predict(features)[0])
 
         prepared = float(form_data["quantity_prepared_kg"])
-        ratio = prediction / prepared if prepared > 0 else 0
-        if ratio < 0.1:
-            risk = "Low"
-            recommendation = "Keep current preparation plan and monitor attendance."
-        elif ratio < 0.25:
-            risk = "Medium"
-            recommendation = "Slightly reduce preparation or improve forecasting for this meal."
-        else:
-            risk = "High"
-            recommendation = "Reduce preparation and increase redistribution planning."
+        risk, recommendation = _get_risk_and_recommendation(prediction, prepared)
 
         if USE_S3 and S3_BUCKET:
             log_payload = {
@@ -249,6 +277,50 @@ def index():
         )
 
     return render_template("index.html")
+
+
+@app.post("/predict")
+def predict_api():
+    """JSON API endpoint for model predictions."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        payload = _validate_payload(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    features = build_feature_frame(payload)
+
+    for col in TRAINING_COLUMNS:
+        if col not in features.columns:
+            features[col] = 0
+
+    features = features[TRAINING_COLUMNS]
+
+    scale_cols = [col for col in SCALE_COLUMNS if col in features.columns]
+    features[scale_cols] = SCALER.transform(features[scale_cols])
+
+    prediction = float(MODEL.predict(features)[0])
+    prepared = float(payload["quantity_prepared_kg"])
+    risk, recommendation = _get_risk_and_recommendation(prediction, prepared)
+
+    response = {
+        "predicted_leftover_kg": round(prediction, 2),
+        "waste_risk_level": risk,
+        "recommendation": recommendation,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+    if USE_S3 and S3_BUCKET:
+        log_payload = {
+            "timestamp": response["timestamp"],
+            "input": payload,
+            "predicted_leftover_kg": response["predicted_leftover_kg"],
+            "waste_risk_level": risk,
+            "recommendation": recommendation,
+        }
+        _upload_prediction_log(S3_BUCKET, log_payload)
+
+    return jsonify(response)
 
 
 if __name__ == "__main__":
