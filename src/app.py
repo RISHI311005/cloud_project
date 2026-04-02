@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime
 from typing import List
@@ -25,6 +26,7 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 S3_MODEL_KEY = os.getenv("S3_MODEL_KEY", "models/model.pkl")
 S3_RAW_KEY = os.getenv("S3_RAW_KEY", "raw/food_waste_dataset.csv")
 S3_PROCESSED_KEY = os.getenv("S3_PROCESSED_KEY", "processed/cleaned_data.csv")
+S3_PREDICTIONS_PREFIX = os.getenv("S3_PREDICTIONS_PREFIX", "predictions/")
 AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2")
 
 CATEGORICAL_COLUMNS: List[str] = [
@@ -68,8 +70,27 @@ def _load_model_from_s3(bucket: str, key: str):
     except ClientError as exc:
         raise RuntimeError(f"Failed to read s3://{bucket}/{key}: {exc}") from exc
 
-    buffer = io.BytesIO(obj["Body"].read())
+    buffer = io.BytesIO(obj["Body"].
+                        read())
     return joblib.load(buffer)
+
+
+def _upload_prediction_log(bucket: str, payload: dict) -> None:
+    """Upload a prediction log as JSON into the predictions/ folder in S3."""
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    key = f"{S3_PREDICTIONS_PREFIX.rstrip('/')}/prediction_{timestamp}.json"
+    body = json.dumps(payload, indent=2)
+
+    try:
+        s3.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=body.encode("utf-8"),
+            ContentType="application/json",
+        )
+    except ClientError as exc:
+        print(f"Warning: failed to upload prediction log to s3://{bucket}/{key}: {exc}")
 
 
 def estimate_per_person_kg(meal_type: str, menu_type: str) -> float:
@@ -209,6 +230,16 @@ def index():
         else:
             risk = "High"
             recommendation = "Reduce preparation and increase redistribution planning."
+
+        if USE_S3 and S3_BUCKET:
+            log_payload = {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "input": form_data,
+                "predicted_leftover_kg": round(prediction, 2),
+                "waste_risk_level": risk,
+                "recommendation": recommendation,
+            }
+            _upload_prediction_log(S3_BUCKET, log_payload)
 
         return render_template(
             "result.html",
