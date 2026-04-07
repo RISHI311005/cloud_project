@@ -4,22 +4,182 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Prediction Result</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Manrope:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
+    <style>
+      :root {
+        --ink: #121013;
+        --muted: #6c6570;
+        --gold: #c6a06b;
+        --garnet: #3b0d19;
+        --ink-soft: rgba(18, 16, 19, 0.08);
+        --velvet: #140b11;
+        --cream: #f7f1ea;
+        --card: #fcfaf7;
+      }
+
+      body.app-shell {
+        min-height: 100vh;
+        font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+        background: radial-gradient(circle at 20% 10%, #2f0b16 0%, #1a0d14 35%, #0c0b10 100%);
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      body.app-shell::before,
+      body.app-shell::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        z-index: 0;
+        opacity: 0.65;
+      }
+
+      body.app-shell::before {
+        width: 380px;
+        height: 380px;
+        background: rgba(198, 160, 107, 0.2);
+        top: -150px;
+        right: -120px;
+      }
+
+      body.app-shell::after {
+        width: 320px;
+        height: 320px;
+        background: rgba(121, 31, 52, 0.25);
+        bottom: -120px;
+        left: -80px;
+      }
+
+      .brand {
+        font-family: "Playfair Display", "Times New Roman", serif;
+        letter-spacing: 0.6px;
+        color: #f7efe6;
+      }
+
+      .panel {
+        background: var(--card);
+        border-radius: 26px;
+        border: 1px solid var(--ink-soft);
+        box-shadow: 0 30px 80px rgba(10, 8, 12, 0.35);
+      }
+
+      .risk-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-weight: 600;
+        background: rgba(198, 160, 107, 0.15);
+        color: #f3e7d7;
+        border: 1px solid rgba(198, 160, 107, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+      }
+
+      .metric {
+        background: var(--cream);
+        border-radius: 18px;
+        padding: 18px;
+        border: 1px solid rgba(198, 160, 107, 0.3);
+      }
+
+      .metric-title {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      .metric-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: var(--garnet);
+      }
+
+      .action-btn {
+        background: linear-gradient(120deg, #c6a06b 0%, #e1c59c 100%);
+        border: none;
+        border-radius: 16px;
+        padding: 12px 18px;
+        font-weight: 600;
+        color: #2b1b12;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 36px rgba(198, 160, 107, 0.35);
+      }
+
+      .ghost-btn {
+        border-radius: 16px;
+        padding: 12px 18px;
+        font-weight: 600;
+        border: 1px solid rgba(198, 160, 107, 0.4);
+        color: #f3e7d7;
+      }
+
+      .reveal {
+        animation: riseIn 0.7s ease both;
+      }
+
+      @keyframes riseIn {
+        from {
+          opacity: 0;
+          transform: translateY(18px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
   </head>
-  <body class="bg-light">
+  <body class="app-shell">
     <div class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-6">
-          <div class="card shadow-sm">
-            <div class="card-body p-4">
-              <h1 class="h4 mb-3">Prediction Result</h1>
-              <p class="mb-2"><strong>Predicted leftover:</strong> {{ prediction }} kg</p>
-              <p class="mb-2"><strong>Waste risk:</strong> {{ risk }}</p>
-              <p class="mb-4"><strong>Recommendation:</strong> {{ recommendation }}</p>
-              <a class="btn btn-outline-primary" href="/">Make another prediction</a>
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5">
+          <div class="panel p-4 p-lg-5 reveal">
+            <div class="risk-pill mb-3">Waste risk</div>
+            <h1 class="brand display-6 fw-bold">{{ risk }} signal</h1>
+            <p class="text-muted mt-3" style="color: #d6c9bc;">
+              Your forecast is ready. Use the guidance to align prep and reduce end-of-service waste.
+            </p>
+            <div class="metric mt-4">
+              <div class="metric-title">Predicted leftover</div>
+              <div class="metric-value">{{ prediction }} kg</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="panel p-4 p-lg-5 reveal" style="animation-delay: 0.1s;">
+            <h2 class="h4 mb-3">Recommendation</h2>
+            <p class="fs-5 mb-4">{{ recommendation }}</p>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="metric h-100">
+                  <div class="metric-title">Next action</div>
+                  <div class="fw-semibold">Adjust prep for the next service.</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="metric h-100">
+                  <div class="metric-title">Keep improving</div>
+                  <div class="fw-semibold">Log turnout for better accuracy.</div>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-3 mt-4">
+              <a class="action-btn btn-lg" href="/">Run another forecast</a>
+              <a class="ghost-btn btn-lg" href="/">Back to form</a>
             </div>
           </div>
         </div>
