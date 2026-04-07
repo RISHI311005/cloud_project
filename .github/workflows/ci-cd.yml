@@ -62,7 +62,7 @@ jobs:
             echo "AWS_DEFAULT_REGION secret is required." >&2
             exit 1
           fi
-          cat > /tmp/ssm-commands.json <<'EOF'
+          cat > /tmp/ssm-commands.json <<EOF
           {
             "commands": [
               "cd ${EC2_APP_DIR}",
