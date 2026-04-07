@@ -42,6 +42,8 @@ jobs:
         env:
           EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
           EC2_APP_DIR: ${{ secrets.EC2_APP_DIR }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           set -e
           if [ -z "${EC2_INSTANCE_ID}" ]; then
@@ -52,10 +54,21 @@ jobs:
             echo "EC2_APP_DIR secret is required." >&2
             exit 1
           fi
+          if [ -z "${S3_BUCKET_NAME}" ]; then
+            echo "S3_BUCKET_NAME secret is required." >&2
+            exit 1
+          fi
+          if [ -z "${AWS_DEFAULT_REGION}" ]; then
+            echo "AWS_DEFAULT_REGION secret is required." >&2
+            exit 1
+          fi
           cat > /tmp/ssm-commands.json <<'EOF'
           {
             "commands": [
               "cd ${EC2_APP_DIR}",
+              "export USE_S3=true",
+              "export S3_BUCKET=${S3_BUCKET_NAME}",
+              "export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}",
               "git pull",
               "if [ -f .venv/bin/activate ]; then . .venv/bin/activate; fi",
               "python -m pip install --upgrade pip",
